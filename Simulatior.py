@@ -34,7 +34,7 @@ class Simulator(object):
     def get_result(self, data):
         self.n_weeks = len(data)
         self.mcts = MCTS(policy_value_fn, self.c_puct, self.n_weeks)
-        price = self.mcts.get_move(self.state)
+        price = self.mcts.get_price(self.state)
         self.mcts.update_with_move(-1)
         return price
 
@@ -47,7 +47,7 @@ def run():
     data_reader = dataReader()
     data = data_reader.get_parsed_data()
 
-    simulator.get_result(data)
+    price = simulator.get_result(data)
 
 if __name__ == "__main__":
     run()

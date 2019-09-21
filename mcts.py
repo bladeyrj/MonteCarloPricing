@@ -139,7 +139,7 @@ class MCTS(object):
         else:
             return 1 if winner == player else -1
 
-    def get_move(self, state):
+    def get_price(self, state):
         """Runs all playouts sequentially and returns the most visited action.
         state: the current game state
         Return: the selected action
