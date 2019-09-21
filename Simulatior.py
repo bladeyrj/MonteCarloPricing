@@ -1,43 +1,50 @@
 from data_reader import dataReader
-from mcts import MCTS
+from mcts import MCTSSeller as MCTS_Pure
+from mcts_alphaZero import MCTSSeller as MCTS_Alpha
 import numpy as np
-
-def policy_value_fn(state):
-    """a function that takes in a state and outputs a list of (action, probability)
-    tuples and a score for the state"""
-    # return uniform probabilities and 0 score for pure MCTS
-    action_probs = np.ones(len(state.availables))/len(state.availables)
-    return zip(state.availables, action_probs), 0
 
 class State(object):
     def __init__(self):
         self.piecesA = 10
         self.piecesB = 10
         self.piecesC = 10
-        self.income = 0
+        self.revenue = 0
         self.availables = [999, 899, 799, 699, 599, 499, 399, 299, 199, 99]
+        self.price = 999
         self.price_list = []
+        self.week = 0
 
-    def simulation_end(self):
+    def end_sim(self):
         if self.piecesA + self.piecesB + self.piecesC == 0:
-            return True, self.income
+            return True, self.revenue
         else:
             return False, -1
         
+    def update_stock(self, price):
+        pass
+
+    def update_week(self, week):
+        self.week = week
+
+    def add_one_week(self):
+        self.week += 1
 
 class Simulator(object):
-    def __init__(self, state, c_puct=5, n_weeks=2000):
+    def __init__(self, state):
         self.state = state
-        self.c_puct = c_puct
-        self.n_weeks = n_weeks
     
-    def get_result(self, data):
-        self.n_weeks = len(data)
-        self.mcts = MCTS(policy_value_fn, self.c_puct, self.n_weeks)
-        price = self.mcts.get_price(self.state)
-        self.mcts.update_with_move(-1)
-        return price
-
+    def start_sim(self, data_reader, mcts_seller):
+        self.data_reader = data_reader
+        price_list = []
+        for week in data_reader.get_weeks():
+            self.state.update_week(week)
+            price = mcts_seller.get_price()
+            price_list.append(price)
+            self.state.update_stock(price)
+            end, revenue = self.state.end_sim()
+            if end:
+                print("Price list: " + price_list)
+                print("Total revenue: " + revenue)
 
 
 def run():
@@ -45,9 +52,9 @@ def run():
     simulator = Simulator(state)
     # load data
     data_reader = dataReader()
-    data = data_reader.get_parsed_data()
+    mcts_seller = MCTS_Pure(c_puct=5, n_playout=1000)
 
-    price = simulator.get_result(data)
+    simulator.start_sim(data_reader, mcts_seller)
 
 if __name__ == "__main__":
     run()
