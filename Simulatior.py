@@ -3,6 +3,8 @@ from mcts import MCTSSeller as MCTS_Pure
 from mcts_alphaZero import MCTSSeller as MCTS_Alpha
 import numpy as np
 
+dr = dataReader()
+
 class State(object):
     def __init__(self):
         self.piecesA = 10
@@ -57,4 +59,5 @@ def run():
     simulator.start_sim(data_reader, mcts_seller)
 
 if __name__ == "__main__":
-    run()
+    print(dr.get_price_of_weekSKU(5, "A"))
+    #run()

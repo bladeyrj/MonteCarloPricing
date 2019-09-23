@@ -6,26 +6,26 @@ data_file = "./data/SimulatedData.xlsx"
 class dataReader(object):
     def __init__(self):
         self.data = []
+        self.read_file()
 
-    def read_file(self, file):
-        file = "./data/SimulatedData.xlsx"
+    def read_file(self, file=data_file):
         data = pd.read_excel(file, sheet_name=0)
         data["NumOfWeek"] = (data["Season"]-1)*12 + data["Week"]
         self.data = data
-        
-    def get_parsed_data(self) -> list:
-        return []
+        print("Finished loading data...")
+        print("Total of %i weeks for simulation." %(self.get_total_weeks()))
     
     def get_data_of_week(self, week):
-        if week >= len(self.data):
-            print("week data out of index")
-            return {}
-        return self.data[week]
+        return self.data[self.data["NumsOfWeek"] == week]
     
-    def get_weeks(self):
-        return len(self.data)
+    def get_price_of_weekSKU(self, week, SKU):
+        week_data = self.data[self.data["NumOfWeek"] == week]
+        return week_data[week_data["SKU"] == SKU].iloc[:, 3:10]
+
+    def get_total_weeks(self):
+        return self.data["NumOfWeek"].max()
 
 
 if __name__ == "__main__":
     dr = dataReader()
-    dr.read_file(data_file)
+    dr.read_file()
