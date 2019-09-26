@@ -14,6 +14,7 @@ class State(object):
         self.availables = [999, 899, 799, 699, 599, 499, 399, 299, 199, 99]
         self.price = 999
         self.price_list = []
+        self.start_of_week = 0
         self.week = 0
 
     def end_sim(self):
@@ -36,9 +37,8 @@ class Simulator(object):
         self.state = state
     
     def start_sim(self, data_reader, mcts_seller):
-        self.data_reader = data_reader
         price_list = []
-        for week in data_reader.get_weeks():
+        for week in dr.get_total_weeks() - 12:
             self.state.update_week(week)
             price = mcts_seller.get_price()
             price_list.append(price)
