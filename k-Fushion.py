@@ -3,6 +3,8 @@ import numpy as np
 import random
 import math
 import copy
+import sys
+import datetime
 from ast import literal_eval
 
 def expand_tree(tree, node):
@@ -87,9 +89,11 @@ def check_sold_out(remain_stock):
 def build_tree(tree, node, k=500): 
     loop = 0 # total 600 weeks -> 50 loops in total
     sold_out_week = []
+    time_stamp = datetime.datetime.now()
     for t in range(k):
         if t % 1000 == 0:
-            print("executed %i loops" % t)
+            print("Executed loops: "+ str(t) + ". Execution time: " + str(datetime.datetime.now()-time_stamp))
+            time_stamp = datetime.datetime.now()
         loop %= 50
         loop += 1
         start_week = (loop - 1) * 12 + 1
@@ -138,8 +142,8 @@ def build_tree(tree, node, k=500):
         do_back_prop(tree, node, pointer, revenue)
     print(float(sum(sold_out_week)) / len(sold_out_week))
 
-def load_tree(file):
-    load_tree = pd.read_csv(file, index_col=0)
+def load_tree(tree_file):
+    load_tree = pd.read_csv(tree_file, index_col=0)
     load_tree = load_tree.to_dict("index")
     for v in load_tree.values():
         try:
@@ -149,13 +153,40 @@ def load_tree(file):
             continue
     return load_tree
 
+def inference(week_tree):
+    pointer = 0
+    remain_stock = {"A":10, "B":10, "C":10}
+    for _ in range(12):
+        pointer = get_max_child_ucb(week_tree, pointer)
+        price = week_tree[pointer]["Price"]
+        print("Sell price: %i" %price)
+        str_in = input("A, B, C sold:")
+        stock_delta = [int(n) for n in str_in.split()]
+        remain_stock["A"] -= stock_delta[0]
+        remain_stock["B"] -= stock_delta[1]
+        remain_stock["C"] -= stock_delta[2]
+        if check_sold_out(remain_stock):
+            break
+        exist_flag = 0
+        for child_id in week_tree[pointer]["Child"]:
+            if week_tree[child_id]["RemainStock"] == remain_stock:
+                exist_flag = 1
+                pointer = child_id
+        if exist_flag == 0:
+            print("Condition not covered...")
+            break
+    print("Inference ended...")
 
 if __name__ == "__main__":
-    file = "./data/SimulatedData.xlsx"
-    data = pd.read_excel(file, sheet_name=0)
+    iterTimes = 1000
+    if len(sys.argv) > 1:
+        iterTimes = int(sys.argv[1])
+    output_tree = "./output/tree_" + str(iterTimes) + ".csv"
+    sim_data = "./data/SimulatedData.xlsx"
+    data = pd.read_excel(sim_data, sheet_name=0)
     data["NumOfWeek"] = (data["Season"]-1)*12 + data["Week"]
 
     remain_stock = {"A":10, "B":10, "C":10}
     week_tree = {0:{"Week":0, "Child": [], "RemainStock":remain_stock, "Type": "D", "MaxPrice":999, "n":0, "V": 0}}
-    build_tree(week_tree, 0, 100)
-    pd.DataFrame(week_tree).T.to_csv("./output/tree.csv")
+    build_tree(week_tree, 0, iterTimes)
+    pd.DataFrame(week_tree).T.to_csv(output_tree)
