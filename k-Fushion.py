@@ -158,4 +158,4 @@ if __name__ == "__main__":
     remain_stock = {"A":10, "B":10, "C":10}
     week_tree = {0:{"Week":0, "Child": [], "RemainStock":remain_stock, "Type": "D", "MaxPrice":999, "n":0, "V": 0}}
     build_tree(week_tree, 0, 100)
-    pd.DataFrame(week_tree).T.to_csv("./data/tree.csv")
+    pd.DataFrame(week_tree).T.to_csv("./output/tree.csv")
