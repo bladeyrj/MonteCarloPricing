@@ -78,7 +78,9 @@ def check_sold_out(remain_stock):
 
 def build_tree(tree, node, k=500): 
     loop = 0 # total 600 weeks -> 50 loops in total
-    for _ in range(k):
+    for t in range(k):
+        if t % 1000 == 1:
+            print("executed %i loops" % t)
         loop %= 50
         loop += 1
         start_week = (loop - 1) * 12 + 1
@@ -115,7 +117,7 @@ def build_tree(tree, node, k=500):
                     break
             # this state is not realized before
             if exist_flag == 0:
-                tree[len(tree)]= {"Week": week, "Child": [], "RemainStock":remain_stock, "Type": "D", "MaxPrice":price, "n":0, "V": 0}
+                tree[len(tree)]= {"Week": week, "Child": [], "Parent": pointer, "RemainStock":remain_stock, "Type": "D", "MaxPrice":price, "n":0, "V": 0}
                 tree[pointer]["Child"].append(len(tree)-1)
                 pointer = len(tree)-1
                 
@@ -131,5 +133,5 @@ if __name__ == "__main__":
 
     remain_stock = {"A":10, "B":10, "C":10}
     week_tree = {0:{"Week":0, "Child": [], "RemainStock":remain_stock, "Type": "D", "MaxPrice":999, "n":0, "V": 0}}
-    build_tree(week_tree, 0, 10)
+    build_tree(week_tree, 0, 100000)
     pd.DataFrame(week_tree).T.to_csv("./data/tree.csv")
