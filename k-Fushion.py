@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
-import math
 import random
-
+import math
+import copy
+from ast import literal_eval
 
 def expand_tree(tree, node):
     if len(tree[node]["Child"]) == 0:
@@ -18,10 +19,15 @@ def get_max_child_ucb(tree, node):
     max_UCB = float("-inf")
     max_node = None
     for child in tree[node]["Child"]:
-        if tree[child]["UCB"] > max_UCB:
+        if tree[child]["UCB"] >= max_UCB:
             max_UCB = tree[child]["UCB"]
             max_node = child
     return max_node
+
+def get_random_child_ucb(tree, node):
+    if len(tree[node]["Child"]) == 0:
+        expand_tree(tree, node) 
+    return tree[node]["Child"][int(random.random() * len(tree[node]["Child"]))]
 
 def do_back_prop(tree, node, pointer, revenue):
     rollout = revenue
@@ -43,8 +49,9 @@ def do_back_prop(tree, node, pointer, revenue):
                     tree[no]["UCB"] = tree[no]["V"] + 2 * (math.log(tree[tree[no]["Parent"]]["n"] + 1)
                      / tree[no]["n"]) ** 0.5
 
-def get_revenue(remain_stock, price, data_week, last_week_price):
+def get_revenue(remain, price, data_week, last_week_price):
     revenue = 0
+    remain_stock = copy.deepcopy(remain)
     for SKU in ["A", "B", "C"]:
         for i in range(7):
             value_i = data_week[data_week["SKU"] == SKU].iloc[:, 3+i].item()
@@ -55,10 +62,11 @@ def get_revenue(remain_stock, price, data_week, last_week_price):
                 return_i = data_week[data_week["SKU"] == SKU].iloc[:, 10+i].item()
                 if return_i > 0:
                     last_week_price[SKU].append(return_i)
-    return revenue
+    return revenue, remain_stock
 
-def get_last_week_revenue(remain_stock, price, data_week, last_week_price):
+def get_last_week_revenue(remain, price, data_week, last_week_price):
     revenue = 0
+    remain_stock = copy.deepcopy(remain)
     for SKU in ["A", "B", "C"]:
         for i in range(7):
             value_i = data_week[data_week["SKU"] == SKU].iloc[:, 3+i].item()
@@ -69,7 +77,7 @@ def get_last_week_revenue(remain_stock, price, data_week, last_week_price):
             if value > price and remain_stock[SKU] > 0:
                 remain_stock[SKU] -= 1
                 revenue += price
-    return revenue
+    return revenue, remain_stock
 
 def check_sold_out(remain_stock):
     if remain_stock["A"] == 0 and remain_stock["B"] == 0 and remain_stock["C"] == 0:
@@ -78,8 +86,9 @@ def check_sold_out(remain_stock):
 
 def build_tree(tree, node, k=500): 
     loop = 0 # total 600 weeks -> 50 loops in total
+    sold_out_week = []
     for t in range(k):
-        if t % 1000 == 1:
+        if t % 1000 == 0:
             print("executed %i loops" % t)
         loop %= 50
         loop += 1
@@ -97,14 +106,18 @@ def build_tree(tree, node, k=500):
             if len(tree[pointer]["Child"]) == 0:
                 expand_tree(tree, pointer)
             # pointer move to S type node
-            pointer = get_max_child_ucb(tree, pointer)
+            #pointer = get_max_child_ucb(tree, pointer)
+            pointer = get_random_child_ucb(tree, pointer)
             price = tree[pointer]["Price"]
             if week != end_week:
-                revenue += get_revenue(remain_stock, price, data[data["NumOfWeek"] == week], last_week_price)
+                r, remain_stock = get_revenue(remain_stock, price, data[data["NumOfWeek"] == week], last_week_price)
+                revenue += r
             else:
                 # simulate the final (12th) week
-                revenue += get_last_week_revenue(remain_stock, price, data[data["NumOfWeek"] == week], last_week_price)
+                r, remain_stock = get_last_week_revenue(remain_stock, price, data[data["NumOfWeek"] == week], last_week_price)
+                revenue += r
             if check_sold_out(remain_stock):
+                sold_out_week.append(week-start_week)
                 break 
             week += 1
             # pointer move to D type node
@@ -123,7 +136,18 @@ def build_tree(tree, node, k=500):
                 
         # Start backpropagation; BSR is the total revenue going forward in the simulation
         do_back_prop(tree, node, pointer, revenue)
+    print(float(sum(sold_out_week)) / len(sold_out_week))
 
+def load_tree(file):
+    load_tree = pd.read_csv(file, index_col=0)
+    load_tree = load_tree.to_dict("index")
+    for v in load_tree.values():
+        try:
+            v["Child"] = literal_eval(v["Child"])
+            v["RemainStock"] = eval(v["RemainStock"])
+        except:
+            continue
+    return load_tree
 
 
 if __name__ == "__main__":
@@ -133,5 +157,5 @@ if __name__ == "__main__":
 
     remain_stock = {"A":10, "B":10, "C":10}
     week_tree = {0:{"Week":0, "Child": [], "RemainStock":remain_stock, "Type": "D", "MaxPrice":999, "n":0, "V": 0}}
-    build_tree(week_tree, 0, 100000)
+    build_tree(week_tree, 0, 100)
     pd.DataFrame(week_tree).T.to_csv("./data/tree.csv")
