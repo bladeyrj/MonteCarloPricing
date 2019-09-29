@@ -97,10 +97,8 @@ def build_tree(tree, node, k=500):
             # expanson
             if len(tree[pointer]["Child"]) == 0:
                 expand_tree(tree, pointer)
-            # selection (two ways of choosing child node)
             # pointer move to S type node
             pointer = get_max_child_ucb(tree, pointer)
-            # pointer = get_random_child_ucb(tree, pointer)
             price = tree[pointer]["Price"]
             if week != end_week:
                 revenue += get_revenue(remain_stock, price, data[data["NumOfWeek"] == week], last_week_price)
