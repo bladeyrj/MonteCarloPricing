@@ -24,19 +24,16 @@ def get_max_child_ucb(tree, node):
     return max_node
 
 def do_back_prop(tree, node, pointer, revenue):
-    BSR = 0
+    rollout = revenue
     while pointer > node:
         pointer = tree[pointer]["Parent"]
-        # Only update BSR if the node is a state-of-nature node (representing an option)
-        if tree[pointer]["Type"] == "S":
-            BSR = BSR + revenue
         # Update V and n
-        tree[pointer]["V"] = (tree[pointer]["V"] * tree[pointer]["n"] + BSR) / (tree[pointer]["n"] + 1)
-        tree[pointer]["n"] = tree[pointer]["n"] + 1
+        tree[pointer]["V"] = (tree[pointer]["V"] * tree[pointer]["n"] + rollout) / (tree[pointer]["n"] + 1)
+        tree[pointer]["n"] += 1
         # Only update UCB for a state-of-nature node
         # Also update the N_i and UCB for options not chosen in this simulation
         if tree[pointer]["Type"] == "S":
-            tree[pointer]["UCB"]=tree[pointer]["V"] + 2 * (
+            tree[pointer]["UCB"] = tree[pointer]["V"] + 2 * (
                 math.log(tree[tree[pointer]["Parent"]]["n"] + 1) / tree[pointer]["n"]) ** 0.5
             peer_list = tree[tree[pointer]["Parent"]]["Child"]
             for no in peer_list:
