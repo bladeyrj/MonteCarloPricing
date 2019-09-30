@@ -4,13 +4,15 @@ import random
 import math
 import copy
 import sys
+import os
 import datetime
 from ast import literal_eval
 
 def expand_tree(tree, node):
     if len(tree[node]["Child"]) == 0:
         # set the price no largert than the previous bid
-        for price in range(99, tree[node]["MaxPrice"]+1, 100):
+        # for price in range(99, tree[node]["MaxPrice"]+1, 100):
+        for price in range(99, 1000, 100):
             tree[len(tree)] = {"Week": tree[node]["Week"], "Child":[], "Parent": node, "Price": price, 
                                  "Type": "S", "n":0, "V": 0, "UCB": float('inf')}
             tree[node]["Child"].append(len(tree)-1)
@@ -178,15 +180,23 @@ def inference(week_tree):
     print("Inference ended...")
 
 if __name__ == "__main__":
-    iterTimes = 1000
+    iter_times = 1000
+    iter_name = "_0"
+    input_tree = ""
     if len(sys.argv) > 1:
-        iterTimes = int(sys.argv[1])
-    output_tree = "./output/tree_" + str(iterTimes) + ".csv"
+        iter_times = int(sys.argv[1])
+    if len(sys.argv) > 2:
+        iter_name = sys.argv[2]
+    if len(sys.argv) > 3:
+        input_tree = sys.argv[3]
+    output_tree = "./output/tree_" + iter_name + ".csv"
     sim_data = "./data/SimulatedData.xlsx"
     data = pd.read_excel(sim_data, sheet_name=0)
     data["NumOfWeek"] = (data["Season"]-1)*12 + data["Week"]
 
     remain_stock = {"A":10, "B":10, "C":10}
     week_tree = {0:{"Week":0, "Child": [], "RemainStock":remain_stock, "Type": "D", "MaxPrice":999, "n":0, "V": 0}}
-    build_tree(week_tree, 0, iterTimes)
+    if os.path.exists("./output/"+input_tree):
+        week_tree = load_tree("./output/"+input_tree)
+    build_tree(week_tree, 0, iter_times)
     pd.DataFrame(week_tree).T.to_csv(output_tree)
