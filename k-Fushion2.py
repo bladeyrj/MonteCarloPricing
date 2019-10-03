@@ -144,63 +144,6 @@ def build_tree(tree, node, k=500):
         do_back_prop(tree, node, pointer, revenue)
     print(float(sum(sold_out_week)) / len(sold_out_week))
 
-def build_tree2(tree, node, k=500): 
-    loop = 0 # total 600 weeks -> 50 loops in total
-    sold_out_week = []
-    time_stamp = datetime.datetime.now()
-    for t in range(k):
-        if t % 1000 == 0:
-            print("Executed loops: "+ str(t) + ". Execution time: " + str(datetime.datetime.now()-time_stamp))
-            time_stamp = datetime.datetime.now()
-        loop %= 50
-        loop += 1
-        start_week = (loop - 1) * 12 + 1
-        end_week = loop * 12
-        
-        pointer = node
-        revenue = 0
-        remain_stock = {"A":10, "B":10, "C":10}
-        last_week_price = {"A":[], "B":[], "C":[]}
-        # simulate from the 1st week to 11th week
-        for week in range(12):
-            # expanson
-            if len(tree[pointer]["Child"]) == 0:
-                expand_tree(tree, pointer)
-            # pointer move to S type node
-            #pointer = get_max_child_ucb(tree, pointer)
-            pointer = get_random_child_ucb(tree, pointer)
-            price = tree[pointer]["Price"]
-            selected_week = data[data["Week"] == week+1]
-            season = int(random.random() * 50)
-            week_data = selected_week[selected_week["Season"] == season+1]
-            if week != end_week:
-                r, remain_stock = get_revenue(remain_stock, price, week_data, last_week_price)
-                revenue += r
-            else:
-                # simulate the final (12th) week
-                r, remain_stock = get_last_week_revenue(remain_stock, price, week_data, last_week_price)
-                revenue += r
-            if check_sold_out(remain_stock):
-                sold_out_week.append(week+1)
-                break
-            # pointer move to D type node
-            # Check if the state has been realized before
-            exist_flag = 0
-            for child_id in tree[pointer]["Child"]:
-                if tree[child_id]["RemainStock"] == remain_stock:
-                    exist_flag = 1
-                    pointer = child_id
-                    break
-            # this state is not realized before
-            if exist_flag == 0:
-                tree[len(tree)]= {"Week": week, "Child": [], "Parent": pointer, "RemainStock":remain_stock, "Type": "D", "MaxPrice":price, "n":0, "V": 0}
-                tree[pointer]["Child"].append(len(tree)-1)
-                pointer = len(tree)-1
-                
-        # Start backpropagation; BSR is the total revenue going forward in the simulation
-        do_back_prop(tree, node, pointer, revenue)
-    print(float(sum(sold_out_week)) / len(sold_out_week))
-
 def load_tree(tree_file):
     load_tree = pd.read_csv(tree_file, index_col=0)
     load_tree = load_tree.to_dict("index")
@@ -256,5 +199,5 @@ if __name__ == "__main__":
     if os.path.exists("./output/"+input_tree):
         week_tree = load_tree("./output/"+input_tree)
         print("loaded tree from " + input_tree)
-    build_tree2(week_tree, 0, iter_times)
+    build_tree(week_tree, 0, iter_times)
     pd.DataFrame(week_tree).T.to_csv(output_tree)
