@@ -28,10 +28,20 @@ def get_max_child_ucb(tree, node):
             max_node = child
     return max_node
 
+def choose_max_ucb(tree, node):
+    max_UCB = float("-inf")
+    max_node = None
+    for child in tree[node]["Child"]:
+        if tree[child]["UCB"] < float("inf") and tree[child]["UCB"] >= max_UCB:
+            max_UCB = tree[child]["UCB"]
+            max_node = child
+    return max_node
+
 def get_random_child_ucb(tree, node):
     if len(tree[node]["Child"]) == 0:
-        expand_tree(tree, node) 
-    return tree[node]["Child"][int(random.random() * len(tree[node]["Child"]))]
+        expand_tree(tree, node)
+    node = tree[node]["Child"][int(random.random() * len(tree[node]["Child"]))]
+    return node
 
 def do_back_prop(tree, node, pointer, revenue):
     rollout = revenue
@@ -43,14 +53,14 @@ def do_back_prop(tree, node, pointer, revenue):
         # Only update UCB for a state-of-nature node
         # Also update the N_i and UCB for options not chosen in this simulation
         if tree[pointer]["Type"] == "S":
-            tree[pointer]["UCB"] = tree[pointer]["V"] + 2 * (
+            tree[pointer]["UCB"] = tree[pointer]["V"] + C * (
                 math.log(tree[tree[pointer]["Parent"]]["n"] + 1) / tree[pointer]["n"]) ** 0.5
             peer_list = tree[tree[pointer]["Parent"]]["Child"]
             for no in peer_list:
                 if pointer == no: # myself
                     continue
                 if tree[no]["n"] > 0:
-                    tree[no]["UCB"] = tree[no]["V"] + 2 * (math.log(tree[tree[no]["Parent"]]["n"] + 1)
+                    tree[no]["UCB"] = tree[no]["V"] + C * (math.log(tree[tree[no]["Parent"]]["n"] + 1)
                      / tree[no]["n"]) ** 0.5
 
 def get_revenue(remain, price, data_week, last_week_price):
@@ -112,8 +122,8 @@ def build_tree(tree, node, k=500):
             if len(tree[pointer]["Child"]) == 0:
                 expand_tree(tree, pointer)
             # pointer move to S type node
-            #pointer = get_max_child_ucb(tree, pointer)
-            pointer = get_random_child_ucb(tree, pointer)
+            pointer = get_max_child_ucb(tree, pointer)
+            #pointer = get_random_child_ucb(tree, pointer)
             price = tree[pointer]["Price"]
             if week != end_week:
                 r, remain_stock = get_revenue(remain_stock, price, data[data["NumOfWeek"] == week], last_week_price)
@@ -123,7 +133,7 @@ def build_tree(tree, node, k=500):
                 r, remain_stock = get_last_week_revenue(remain_stock, price, data[data["NumOfWeek"] == week], last_week_price)
                 revenue += r
             if check_sold_out(remain_stock):
-                sold_out_week.append(week-start_week)
+                sold_out_week.append(week-start_week+1)
                 break 
             week += 1
             # pointer move to D type node
@@ -142,20 +152,14 @@ def build_tree(tree, node, k=500):
                 
         # Start backpropagation; BSR is the total revenue going forward in the simulation
         do_back_prop(tree, node, pointer, revenue)
-    print(float(sum(sold_out_week)) / len(sold_out_week))
 
 def build_tree2(tree, node, k=500): 
-    loop = 0 # total 600 weeks -> 50 loops in total
     sold_out_week = []
     time_stamp = datetime.datetime.now()
     for t in range(k):
         if t % 1000 == 0:
             print("Executed loops: "+ str(t) + ". Execution time: " + str(datetime.datetime.now()-time_stamp))
             time_stamp = datetime.datetime.now()
-        loop %= 50
-        loop += 1
-        start_week = (loop - 1) * 12 + 1
-        end_week = loop * 12
         
         pointer = node
         revenue = 0
@@ -167,13 +171,12 @@ def build_tree2(tree, node, k=500):
             if len(tree[pointer]["Child"]) == 0:
                 expand_tree(tree, pointer)
             # pointer move to S type node
-            #pointer = get_max_child_ucb(tree, pointer)
-            pointer = get_random_child_ucb(tree, pointer)
+            pointer = get_max_child_ucb(tree, pointer)
             price = tree[pointer]["Price"]
             selected_week = data[data["Week"] == week+1]
             season = int(random.random() * 50)
             week_data = selected_week[selected_week["Season"] == season+1]
-            if week != end_week:
+            if week != 11:
                 r, remain_stock = get_revenue(remain_stock, price, week_data, last_week_price)
                 revenue += r
             else:
@@ -199,7 +202,6 @@ def build_tree2(tree, node, k=500):
                 
         # Start backpropagation; BSR is the total revenue going forward in the simulation
         do_back_prop(tree, node, pointer, revenue)
-    print(float(sum(sold_out_week)) / len(sold_out_week))
 
 def load_tree(tree_file):
     load_tree = pd.read_csv(tree_file, index_col=0)
@@ -236,25 +238,78 @@ def inference(week_tree):
             break
     print("Inference ended...")
 
+def test(tree, data):
+    sold_out_week = []
+    week_revenue = []
+    for loop in range(50): # total 600 weeks -> 50 loops in total
+        start_week = loop * 12 + 1
+        end_week = (loop + 1) * 12
+        
+        week = start_week
+        pointer = 0
+        revenue = 0
+        remain_stock = {"A":10, "B":10, "C":10}
+        last_week_price = {"A":[], "B":[], "C":[]}
+        # simulate from the 1st week to 11th week
+        while week <= end_week:
+            # pointer move to S type node
+            pointer = choose_max_ucb(tree, pointer)
+            price = tree[pointer]["Price"]
+            week_data = data[data["NumOfWeek"] == week]
+            if week != end_week:
+                r, remain_stock = get_revenue(remain_stock, price, week_data, last_week_price)
+                revenue += r
+            else:
+                # simulate the final (12th) week
+                r, remain_stock = get_last_week_revenue(remain_stock, price, week_data, last_week_price)
+                revenue += r
+            if check_sold_out(remain_stock):
+                break
+            week += 1
+            # pointer move to D type node
+            # Check if the state has been realized before
+            exist_flag = 0
+            for child_id in tree[pointer]["Child"]:
+                if tree[child_id]["RemainStock"] == remain_stock:
+                    exist_flag = 1
+                    pointer = child_id
+                    break
+            # this state is not realized before
+            if exist_flag == 0:
+                print("case exception at season %i, week %i." %(loop+1, week%12))
+                break
+        sold_out_week.append((week-1)%12+1)
+        week_revenue.append(revenue)
+    print(week_revenue)
+    print(sold_out_week)
+    print("Average sold out week: %f." %(float(sum(sold_out_week)) / len(sold_out_week)))
+    print("Average revenue: %f." %(float(sum(week_revenue)) / len(week_revenue)))
+
 if __name__ == "__main__":
     iter_times = 1000
     iter_name = "_0"
-    input_tree = "t"
+    input_tree = "test"
+    C = 2 # C in ucb
     if len(sys.argv) > 1:
         iter_times = int(sys.argv[1])
     if len(sys.argv) > 2:
         iter_name = sys.argv[2]
     if len(sys.argv) > 3:
         input_tree = sys.argv[3]
-    output_tree = "./output/tree_" + iter_name + ".csv"
+    if len(sys.argv) > 4:
+        C = float(sys.argv[4])
+        print("C in USB is set to be: %f" %C)
+    output_tree = "./output/" + iter_name + ".csv"
     sim_data = "./data/SimulatedData.xlsx"
     data = pd.read_excel(sim_data, sheet_name=0)
     data["NumOfWeek"] = (data["Season"]-1)*12 + data["Week"]
 
     remain_stock = {"A":10, "B":10, "C":10}
-    week_tree = {0:{"Week":0, "Child": [], "RemainStock":remain_stock, "Type": "D", "MaxPrice":999, "n":0, "V": 0}}
-    if os.path.exists("./output/"+input_tree):
-        week_tree = load_tree("./output/"+input_tree)
+    week_tree = {0:{"Week":0, "Child": [], "RemainStock": remain_stock, "Type": "D", "MaxPrice":999, "n":0, "V": 0}}
+    if os.path.exists("./output/"+input_tree+".csv"):
+        week_tree = load_tree("./output/"+input_tree+".csv")
         print("loaded tree from " + input_tree)
-    build_tree2(week_tree, 0, iter_times)
-    pd.DataFrame(week_tree).T.to_csv(output_tree)
+    else:
+        build_tree(week_tree, 0, iter_times)
+        pd.DataFrame(week_tree).T.to_csv(output_tree)
+    test(week_tree, data)
