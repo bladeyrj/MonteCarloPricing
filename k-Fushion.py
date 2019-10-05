@@ -19,7 +19,9 @@ def expand_tree(tree, node):
 
 def get_max_child_ucb(tree, node):
     if len(tree[node]["Child"]) == 0:
-        expand_tree(tree, node) 
+        expand_tree(tree, node)
+    if tree[node]['n'] < 10:
+        return get_random_child_ucb(tree, node)
     max_UCB = float("-inf")
     max_node = None
     for child in tree[node]["Child"]:
@@ -214,30 +216,6 @@ def load_tree(tree_file):
             continue
     return load_tree
 
-def inference(week_tree):
-    pointer = 0
-    remain_stock = {"A":10, "B":10, "C":10}
-    for _ in range(12):
-        pointer = get_max_child_ucb(week_tree, pointer)
-        price = week_tree[pointer]["Price"]
-        print("Sell price: %i" %price)
-        str_in = input("A, B, C sold:")
-        stock_delta = [int(n) for n in str_in.split()]
-        remain_stock["A"] -= stock_delta[0]
-        remain_stock["B"] -= stock_delta[1]
-        remain_stock["C"] -= stock_delta[2]
-        if check_sold_out(remain_stock):
-            break
-        exist_flag = 0
-        for child_id in week_tree[pointer]["Child"]:
-            if week_tree[child_id]["RemainStock"] == remain_stock:
-                exist_flag = 1
-                pointer = child_id
-        if exist_flag == 0:
-            print("Condition not covered...")
-            break
-    print("Inference ended...")
-
 def test(tree, data):
     sold_out_week = []
     week_revenue = []
@@ -251,10 +229,12 @@ def test(tree, data):
         remain_stock = {"A":10, "B":10, "C":10}
         last_week_price = {"A":[], "B":[], "C":[]}
         # simulate from the 1st week to 11th week
+        price_his = []
         while week <= end_week:
             # pointer move to S type node
             pointer = choose_max_ucb(tree, pointer)
             price = tree[pointer]["Price"]
+            price_his.append(price)
             week_data = data[data["NumOfWeek"] == week]
             if week != end_week:
                 r, remain_stock = get_revenue(remain_stock, price, week_data, last_week_price)
@@ -263,6 +243,7 @@ def test(tree, data):
                 # simulate the final (12th) week
                 r, remain_stock = get_last_week_revenue(remain_stock, price, week_data, last_week_price)
                 revenue += r
+                break
             if check_sold_out(remain_stock):
                 break
             week += 1
@@ -280,16 +261,18 @@ def test(tree, data):
                 break
         sold_out_week.append((week-1)%12+1)
         week_revenue.append(revenue)
+        print(price_his)
     print(week_revenue)
     print(sold_out_week)
     print("Average sold out week: %f." %(float(sum(sold_out_week)) / len(sold_out_week)))
     print("Average revenue: %f." %(float(sum(week_revenue)) / len(week_revenue)))
 
 if __name__ == "__main__":
+    print("Start simulation...")
     iter_times = 1000
     iter_name = "_0"
-    input_tree = "test"
-    C = 2 # C in ucb
+    input_tree = "ucb04"
+    C = 1000 # C in ucb
     if len(sys.argv) > 1:
         iter_times = int(sys.argv[1])
     if len(sys.argv) > 2:
@@ -310,6 +293,7 @@ if __name__ == "__main__":
         week_tree = load_tree("./output/"+input_tree+".csv")
         print("loaded tree from " + input_tree)
     else:
+        print("Train the tree...")
         build_tree(week_tree, 0, iter_times)
         pd.DataFrame(week_tree).T.to_csv(output_tree)
     test(week_tree, data)
