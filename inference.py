@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import sys
+from ast import literal_eval
 
 def choose_max_ucb(tree, node):
     max_UCB = float("-inf")
@@ -51,12 +52,40 @@ def inference(week_tree):
             break
     print("Inference ended...")
 
-if __name__ == "__main__":
-    input_tree = sys.argv[1]
-    if os.path.exists("./output/"+input_tree+".csv"):
-        week_tree = load_tree("./output/"+input_tree+".csv")
-        print("loaded tree from " + input_tree)
-    else:
-        exit("Tree not exist.")
+def search(week_tree):
+    pointer = 0
+    remain_stock = {"A":10, "B":10, "C":10}
+    for i in range(12):
+        str_in = input("A, B, C sold: ")
+        stock_delta = [int(n) for n in str_in.split()]
+        remain_stock["A"] -= stock_delta[0]
+        remain_stock["B"] -= stock_delta[1]
+        remain_stock["C"] -= stock_delta[2]
+        if check_sold_out(remain_stock):
+            break
+        stock_str = str(remain_stock)
+        week_tree["NumOfWeek"] = week_tree["Week"] % 12
+        search_week = week_tree[week_tree["NumOfWeek"] == 2]
+        search_type = search_week[search_week["Type"] == "D"]
+        search_stock = search_type[search_type["RemainStock"] == stock_str]
+        output = []
+        for se in search_stock["Child"]:
+            child_list = literal_eval(se)
+            output.append(week_tree[week_tree.index.isin(child_list)])
+        result = pd.concat(output)
+        print(result[result["UCB"] != float(inf)])
 
-    inference(week_tree)
+if __name__ == "__main__":
+    input_tree = "ucb12"
+    if len(sys.argv) > 1:
+        input_tree = sys.argv[1]
+    input_file = "./output/"+input_tree+".csv"
+    search(pd.read_csv(input_file, index_col=0))
+    # if os.path.exists("./output/"+input_tree+".csv"):
+    #     print("Loading tree from " + input_tree)
+    #     week_tree = load_tree("./output/"+input_tree+".csv")
+    # else:
+    #     exit("Tree not exist.")
+
+    # inference(week_tree)
+    
